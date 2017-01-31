@@ -1,5 +1,5 @@
 {
-    "name": "MonsieurGourmand/oauth2",
+    "name": "monsieurgourmand/oauth2",
     "description": "Fork de adoy/oauth2 utilisé pour le client MonsieurGourmand/client",
     "license": "LGPL-2.1", 
     "authors": [
