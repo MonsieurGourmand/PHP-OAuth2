@@ -427,7 +427,7 @@ class Client
                 $curl_options[CURLOPT_POSTFIELDS] = $parameters;
 
                 // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
-                $url .= '?'.$this->access_token_param_name."=". $parameters[$this->access_token_param_name];
+                $url .= '?access_token='. $parameters[$this->access_token_param_name];
                 // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
             break;
             case self::HTTP_METHOD_HEAD:
