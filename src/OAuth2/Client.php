@@ -415,10 +415,6 @@ class Client
                 /* No break */
             case self::HTTP_METHOD_PUT:
             case self::HTTP_METHOD_PATCH:
-                // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
-                $url .= '?access_token='. $parameters[$this->access_token_param_name];
-                // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
-
                 /**
                  * Passing an array to CURLOPT_POSTFIELDS will encode the data as multipart/form-data,
                  * while passing a URL-encoded string will encode the data as application/x-www-form-urlencoded.
