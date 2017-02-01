@@ -415,6 +415,9 @@ class Client
                 /* No break */
             case self::HTTP_METHOD_PUT:
             case self::HTTP_METHOD_PATCH:
+                // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
+                $url .= '?access_token='. $parameters[$this->access_token_param_name];
+                // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
 
                 /**
                  * Passing an array to CURLOPT_POSTFIELDS will encode the data as multipart/form-data,
@@ -425,10 +428,6 @@ class Client
                     $parameters = http_build_query($parameters, null, '&');
                 }
                 $curl_options[CURLOPT_POSTFIELDS] = $parameters;
-
-                // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
-                $url .= '?access_token='. $parameters[$this->access_token_param_name];
-                // RD - FIX de la Library pour supporter l'accesstoken en GET sur des requetes POST / PUT
             break;
             case self::HTTP_METHOD_HEAD:
                 $curl_options[CURLOPT_NOBODY] = true;
