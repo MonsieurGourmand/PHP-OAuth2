@@ -50,6 +50,7 @@ class Client
     const GRANT_TYPE_PASSWORD           = 'password';
     const GRANT_TYPE_CLIENT_CREDENTIALS = 'client_credentials';
     const GRANT_TYPE_REFRESH_TOKEN      = 'refresh_token';
+    const GRANT_TYPE_APIKEY             = 'https://api.monsieurgourmand.com/grant/apikey';
 
     /**
      * HTTP Methods
