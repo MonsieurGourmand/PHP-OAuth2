@@ -50,7 +50,7 @@ class Client
     const GRANT_TYPE_PASSWORD           = 'password';
     const GRANT_TYPE_CLIENT_CREDENTIALS = 'client_credentials';
     const GRANT_TYPE_REFRESH_TOKEN      = 'refresh_token';
-    const GRANT_TYPE_APIKEY             = 'https://api.monsieurgourmand.com/grant/apikey';
+    const GRANT_TYPE_APIKEY             = 'apikey';
 
     /**
      * HTTP Methods
@@ -403,8 +403,9 @@ class Client
      * @return array
      */
     private function executeRequest($url, $parameters = array(), $http_method = self::HTTP_METHOD_GET, array $http_headers = null, $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
-    {
+    {       
         $curl_options = array(
+            CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_CUSTOMREQUEST  => $http_method
