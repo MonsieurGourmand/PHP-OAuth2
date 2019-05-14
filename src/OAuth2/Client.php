@@ -140,7 +140,7 @@ class Client
      *
      * @var array
      */
-    protected $curl_options = array();
+    protected $curl_options = [];
 
     /**
      * Construct
@@ -194,17 +194,20 @@ class Client
      *
      * @param string $auth_endpoint Url of the authentication endpoint
      * @param string $redirect_uri  Redirection URI
-     * @param array  $extra_parameters  Array of extra parameters like scope or state (Ex: array('scope' => null, 'state' => ''))
+     * @param array  $extra_parameters  Array of extra parameters like scope or state (Ex: ['scope' => null, 'state' => ''])
      *
      * @return string URL used for authentication
      */
-    public function getAuthenticationUrl($auth_endpoint, $redirect_uri, array $extra_parameters = array())
+    public function getAuthenticationUrl($auth_endpoint, $redirect_uri, array $extra_parameters = [])
     {
-        $parameters = array_merge(array(
-            'response_type' => 'code',
-            'client_id'     => $this->client_id,
-            'redirect_uri'  => $redirect_uri
-        ), $extra_parameters);
+        $parameters = array_merge([
+                'response_type' => 'code',
+                'client_id'     => $this->client_id,
+                'redirect_uri'  => $redirect_uri,
+            ],
+            $extra_parameters
+        );
+
         return $auth_endpoint . '?' . http_build_query($parameters, null, '&');
     }
 
@@ -220,23 +223,29 @@ class Client
      *
      * @throws Exception
      */
-    public function getAccessToken($token_endpoint, $grant_type, array $parameters, array $extra_headers = array())
+    public function getAccessToken($token_endpoint, $grant_type, array $parameters, array $extra_headers = [])
     {
         if (!$grant_type) {
             throw new InvalidArgumentException('The grant_type is mandatory.', InvalidArgumentException::INVALID_GRANT_TYPE);
         }
+
         $grantTypeClassName = $this->convertToCamelCase($grant_type);
         $grantTypeClass =  __NAMESPACE__ . '\\GrantType\\' . $grantTypeClassName;
+
         if (!class_exists($grantTypeClass)) {
             throw new InvalidArgumentException('Unknown grant type \'' . $grant_type . '\'', InvalidArgumentException::INVALID_GRANT_TYPE);
         }
+
         $grantTypeObject = new $grantTypeClass();
         $grantTypeObject->validateParameters($parameters);
+
         if (!defined($grantTypeClass . '::GRANT_TYPE')) {
             throw new Exception('Unknown constant GRANT_TYPE for class ' . $grantTypeClassName, Exception::GRANT_TYPE_ERROR);
         }
+
         $parameters['grant_type'] = $grantTypeClass::GRANT_TYPE;
         $http_headers = $extra_headers;
+
         switch ($this->client_auth) {
             case self::AUTH_TYPE_URI:
             case self::AUTH_TYPE_FORM:
@@ -343,7 +352,7 @@ class Client
      *
      * @throws Exception
      */
-    public function fetch(string $protected_resource_url, $parameters = array(), $http_method = self::HTTP_METHOD_GET, array $http_headers = array(), $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
+    public function fetch(string $protected_resource_url, $parameters = [], $http_method = self::HTTP_METHOD_GET, array $http_headers = [], $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
     {
         if ($this->access_token) {
             switch ($this->access_token_type) {
@@ -371,6 +380,7 @@ class Client
                     break;
             }
         }
+
         return $this->executeRequest($protected_resource_url, $parameters, $http_method, $http_headers, $form_content_type);
     }
 
@@ -425,14 +435,14 @@ class Client
      *
      * @throws Exception
      */
-    private function executeRequest($url, $parameters = array(), $http_method = self::HTTP_METHOD_GET, array $http_headers = null, $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
+    private function executeRequest($url, $parameters = [], $http_method = self::HTTP_METHOD_GET, array $http_headers = null, $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
     {       
-        $curl_options = array(
+        $curl_options = [
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_CUSTOMREQUEST  => $http_method
-        );
+        ];
 
         switch($http_method) {
             case self::HTTP_METHOD_POST:
@@ -448,14 +458,16 @@ class Client
                 if(is_array($parameters) && self::HTTP_FORM_CONTENT_TYPE_APPLICATION === $form_content_type) {
                     $parameters = http_build_query($parameters, null, '&');
                 } elseif (self::HTTP_FORM_CONTENT_TYPE_MULTIPART === $form_content_type && isset($parameters['file_contents'])) {
-                    /** @var UploadedFile $file */
                     $file = $parameters['file_contents'];
-                    $parameters = [
-                        'file' => new CurlFile($file->getRealPath(), $file->getClientMimeType(), $file->getClientOriginalName()),
-                    ];
+
+                    if ($file instanceof UploadedFile) {
+                        $parameters = [
+                            'file' => new CurlFile($file->getRealPath(), $file->getClientMimeType(), $file->getClientOriginalName()),
+                        ];
+                    }
                 }
                 $curl_options[CURLOPT_POSTFIELDS] = $parameters;
-            break;
+                break;
             case self::HTTP_METHOD_HEAD:
                 $curl_options[CURLOPT_NOBODY] = true;
                 /* No break */
@@ -474,7 +486,7 @@ class Client
         $curl_options[CURLOPT_URL] = $url;
 
         if (is_array($http_headers)) {
-            $header = array();
+            $header = [];
             foreach($http_headers as $key => $parsed_urlvalue) {
                 $header[] = "$key: $parsed_urlvalue";
             }
@@ -506,11 +518,11 @@ class Client
         }
         curl_close($ch);
 
-        return array(
+        return [
             'result' => (null === $json_decode) ? $result : $json_decode,
             'code' => $http_code,
             'content_type' => $content_type
-        );
+        ];
     }
 
     /**
@@ -536,6 +548,7 @@ class Client
     {
         $parts = explode('_', $grant_type);
         array_walk($parts, function(&$item) { $item = ucfirst($item);});
+
         return implode('', $parts);
     }
 }
