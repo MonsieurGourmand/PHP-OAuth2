@@ -105,7 +105,7 @@ class Client
      *
      * @var int
      */
-    protected $access_token_type = self::ACCESS_TOKEN_URI;
+    protected $access_token_type = self::ACCESS_TOKEN_BEARER;
 
     /**
      * Access Token Secret
