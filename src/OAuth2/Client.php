@@ -26,6 +26,10 @@
  */
 namespace OAuth2;
 
+use CURLFile;
+use Symfony\Component\HttpFoundation\File\File;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+
 class Client
 {
     /**
@@ -101,7 +105,7 @@ class Client
      *
      * @var int
      */
-    protected $access_token_type = self::ACCESS_TOKEN_URI;
+    protected $access_token_type = self::ACCESS_TOKEN_BEARER;
 
     /**
      * Access Token Secret
@@ -136,16 +140,19 @@ class Client
      *
      * @var array
      */
-    protected $curl_options = array();
+    protected $curl_options = [];
 
     /**
      * Construct
      *
-     * @param string $client_id Client ID
-     * @param string $client_secret Client Secret
-     * @param int    $client_auth (AUTH_TYPE_URI, AUTH_TYPE_AUTHORIZATION_BASIC, AUTH_TYPE_FORM)
+     * @param string $client_id        Client ID
+     * @param string $client_secret    Client Secret
+     * @param int    $client_auth      (AUTH_TYPE_URI, AUTH_TYPE_AUTHORIZATION_BASIC, AUTH_TYPE_FORM)
      * @param string $certificate_file Indicates if we want to use a certificate file to trust the server. Optional, defaults to null.
+     *
      * @return void
+     *
+     * @throws Exception
      */
     public function __construct($client_id, $client_secret, $client_auth = self::AUTH_TYPE_URI, $certificate_file = null)
     {
@@ -187,45 +194,58 @@ class Client
      *
      * @param string $auth_endpoint Url of the authentication endpoint
      * @param string $redirect_uri  Redirection URI
-     * @param array  $extra_parameters  Array of extra parameters like scope or state (Ex: array('scope' => null, 'state' => ''))
+     * @param array  $extra_parameters  Array of extra parameters like scope or state (Ex: ['scope' => null, 'state' => ''])
+     *
      * @return string URL used for authentication
      */
-    public function getAuthenticationUrl($auth_endpoint, $redirect_uri, array $extra_parameters = array())
+    public function getAuthenticationUrl($auth_endpoint, $redirect_uri, array $extra_parameters = [])
     {
-        $parameters = array_merge(array(
-            'response_type' => 'code',
-            'client_id'     => $this->client_id,
-            'redirect_uri'  => $redirect_uri
-        ), $extra_parameters);
+        $parameters = array_merge([
+                'response_type' => 'code',
+                'client_id'     => $this->client_id,
+                'redirect_uri'  => $redirect_uri,
+            ],
+            $extra_parameters
+        );
+
         return $auth_endpoint . '?' . http_build_query($parameters, null, '&');
     }
 
     /**
      * getAccessToken
      *
-     * @param string $token_endpoint    Url of the token endpoint
-     * @param int    $grant_type        Grant Type ('authorization_code', 'password', 'client_credentials', 'refresh_token', or a custom code (@see GrantType Classes)
-     * @param array  $parameters        Array sent to the server (depend on which grant type you're using)
-     * @param array  $extra_headers     Array of extra headers
+     * @param string $token_endpoint Url of the token endpoint
+     * @param int    $grant_type     Grant Type ('authorization_code', 'password', 'client_credentials', 'refresh_token', or a custom code (@see GrantType Classes)
+     * @param array  $parameters     Array sent to the server (depend on which grant type you're using)
+     * @param array  $extra_headers  Array of extra headers
+     *
      * @return array Array of parameters required by the grant_type (CF SPEC)
+     *
+     * @throws Exception
      */
-    public function getAccessToken($token_endpoint, $grant_type, array $parameters, array $extra_headers = array())
+    public function getAccessToken($token_endpoint, $grant_type, array $parameters, array $extra_headers = [])
     {
         if (!$grant_type) {
             throw new InvalidArgumentException('The grant_type is mandatory.', InvalidArgumentException::INVALID_GRANT_TYPE);
         }
+
         $grantTypeClassName = $this->convertToCamelCase($grant_type);
         $grantTypeClass =  __NAMESPACE__ . '\\GrantType\\' . $grantTypeClassName;
+
         if (!class_exists($grantTypeClass)) {
             throw new InvalidArgumentException('Unknown grant type \'' . $grant_type . '\'', InvalidArgumentException::INVALID_GRANT_TYPE);
         }
+
         $grantTypeObject = new $grantTypeClass();
         $grantTypeObject->validateParameters($parameters);
+
         if (!defined($grantTypeClass . '::GRANT_TYPE')) {
             throw new Exception('Unknown constant GRANT_TYPE for class ' . $grantTypeClassName, Exception::GRANT_TYPE_ERROR);
         }
+
         $parameters['grant_type'] = $grantTypeClass::GRANT_TYPE;
         $http_headers = $extra_headers;
+
         switch ($this->client_auth) {
             case self::AUTH_TYPE_URI:
             case self::AUTH_TYPE_FORM:
@@ -248,6 +268,7 @@ class Client
      * setToken
      *
      * @param string $token Set the access token
+     *
      * @return void
      */
     public function setAccessToken($token)
@@ -269,6 +290,7 @@ class Client
      * Set the client authentication type
      *
      * @param string $client_auth (AUTH_TYPE_URI, AUTH_TYPE_AUTHORIZATION_BASIC, AUTH_TYPE_FORM)
+     *
      * @return void
      */
     public function setClientAuthType($client_auth)
@@ -281,6 +303,7 @@ class Client
      *
      * @param int   $option The CURLOPT_XXX option to set
      * @param mixed $value  The value to be set on option
+     *
      * @return void
      */
     public function setCurlOption($option, $value)
@@ -292,6 +315,7 @@ class Client
      * Set multiple options for a cURL transfer
      *
      * @param array $options An array specifying which options to set and their values
+     *
      * @return void
      */
     public function setCurlOptions($options)
@@ -302,9 +326,10 @@ class Client
     /**
      * Set the access token type
      *
-     * @param int $type Access token type (ACCESS_TOKEN_BEARER, ACCESS_TOKEN_MAC, ACCESS_TOKEN_URI)
-     * @param string $secret The secret key used to encrypt the MAC header
+     * @param int    $type      Access token type (ACCESS_TOKEN_BEARER, ACCESS_TOKEN_MAC, ACCESS_TOKEN_URI)
+     * @param string $secret    The secret key used to encrypt the MAC header
      * @param string $algorithm Algorithm used to encrypt the signature
+     *
      * @return void
      */
     public function setAccessTokenType($type, $secret = null, $algorithm = null)
@@ -317,14 +342,17 @@ class Client
     /**
      * Fetch a protected ressource
      *
-     * @param string $protected_ressource_url Protected resource URL
-     * @param array  $parameters Array of parameters
-     * @param string $http_method HTTP Method to use (POST, PUT, GET, HEAD, DELETE)
-     * @param array  $http_headers HTTP headers
-     * @param int    $form_content_type HTTP form content type to use
+     * @param string $protected_resource_url Protected resource URL
+     * @param array  $parameters             Array of parameters
+     * @param string $http_method            HTTP Method to use (POST, PUT, GET, HEAD, DELETE)
+     * @param array  $http_headers           HTTP headers
+     * @param int    $form_content_type      HTTP form content type to use
+     *
      * @return array
+     *
+     * @throws Exception
      */
-    public function fetch($protected_resource_url, $parameters = array(), $http_method = self::HTTP_METHOD_GET, array $http_headers = array(), $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
+    public function fetch(string $protected_resource_url, $parameters = [], $http_method = self::HTTP_METHOD_GET, array $http_headers = [], $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
     {
         if ($this->access_token) {
             switch ($this->access_token_type) {
@@ -352,15 +380,17 @@ class Client
                     break;
             }
         }
+
         return $this->executeRequest($protected_resource_url, $parameters, $http_method, $http_headers, $form_content_type);
     }
 
     /**
      * Generate the MAC signature
      *
-     * @param string $url Called URL
-     * @param array  $parameters Parameters
+     * @param string $url         Called URL
+     * @param array  $parameters  Parameters
      * @param string $http_method Http Method
+     *
      * @return string
      */
     private function generateMACSignature($url, $parameters, $http_method)
@@ -395,21 +425,24 @@ class Client
     /**
      * Execute a request (with curl)
      *
-     * @param string $url URL
-     * @param mixed  $parameters Array of parameters
-     * @param string $http_method HTTP Method
-     * @param array  $http_headers HTTP Headers
+     * @param string $url               URL
+     * @param mixed  $parameters        Array of parameters
+     * @param string $http_method       HTTP Method
+     * @param array  $http_headers      HTTP Headers
      * @param int    $form_content_type HTTP form content type to use
+     *
      * @return array
+     *
+     * @throws Exception
      */
-    private function executeRequest($url, $parameters = array(), $http_method = self::HTTP_METHOD_GET, array $http_headers = null, $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
+    private function executeRequest($url, $parameters = [], $http_method = self::HTTP_METHOD_GET, array $http_headers = null, $form_content_type = self::HTTP_FORM_CONTENT_TYPE_MULTIPART)
     {       
-        $curl_options = array(
+        $curl_options = [
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_CUSTOMREQUEST  => $http_method
-        );
+        ];
 
         switch($http_method) {
             case self::HTTP_METHOD_POST:
@@ -424,9 +457,17 @@ class Client
                  */
                 if(is_array($parameters) && self::HTTP_FORM_CONTENT_TYPE_APPLICATION === $form_content_type) {
                     $parameters = http_build_query($parameters, null, '&');
+                } elseif (self::HTTP_FORM_CONTENT_TYPE_MULTIPART === $form_content_type && isset($parameters['file_contents'])) {
+                    $file = $parameters['file_contents'];
+
+                    if ($file instanceof UploadedFile) {
+                        $parameters = [
+                            'file' => new CurlFile($file->getRealPath(), $file->getClientMimeType(), $file->getClientOriginalName()),
+                        ];
+                    }
                 }
                 $curl_options[CURLOPT_POSTFIELDS] = $parameters;
-            break;
+                break;
             case self::HTTP_METHOD_HEAD:
                 $curl_options[CURLOPT_NOBODY] = true;
                 /* No break */
@@ -445,7 +486,7 @@ class Client
         $curl_options[CURLOPT_URL] = $url;
 
         if (is_array($http_headers)) {
-            $header = array();
+            $header = [];
             foreach($http_headers as $key => $parsed_urlvalue) {
                 $header[] = "$key: $parsed_urlvalue";
             }
@@ -477,17 +518,18 @@ class Client
         }
         curl_close($ch);
 
-        return array(
+        return [
             'result' => (null === $json_decode) ? $result : $json_decode,
             'code' => $http_code,
             'content_type' => $content_type
-        );
+        ];
     }
 
     /**
      * Set the name of the parameter that carry the access token
      *
      * @param string $name Token parameter name
+     *
      * @return void
      */
     public function setAccessTokenParamName($name)
@@ -499,12 +541,14 @@ class Client
      * Converts the class name to camel case
      *
      * @param  mixed  $grant_type  the grant type
+     *
      * @return string
      */
     private function convertToCamelCase($grant_type)
     {
         $parts = explode('_', $grant_type);
         array_walk($parts, function(&$item) { $item = ucfirst($item);});
+
         return implode('', $parts);
     }
 }
